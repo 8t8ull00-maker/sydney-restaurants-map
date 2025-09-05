@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sydney Italian & Indian Restaurants Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-sidebar-v2/css/leaflet-sidebar.min.css" />
+<style>
+html, body {height:100%; margin:0; padding:0;}
+#map {position:absolute; top:0; left:0; right:0; bottom:0; z-index:1;}
+#sidebarToggle {position:absolute; top:10px; right:10px; z-index:1001; background:#fff; padding:6px 10px; border-radius:6px; box-shadow:0 0 8px rgba(0,0,0,0.3); cursor:pointer;}
+#legend, #categories {position:absolute; background:#fff; padding:10px; border-radius:6px; box-shadow:0 0 8px rgba(0,0,0,0.3); font-size:12px; z-index:1000; cursor:move;}
+#legend {bottom:30px; left:10px;}
+#categories {bottom:30px; right:10px;}
+.filter-container {position:absolute; top:10px; left:10px; z-index:1000; background:#fff; padding:10px; border-radius:6px; box-shadow:0 0 8px rgba(0,0,0,0.3);}
+.restaurant-list-item {margin-bottom:5px;}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="filter-container">
+<label>Cuisine:</label>
+<select id="cuisineFilter">
+<option value="All">All</option>
+<option value="Italian">Italian</option>
+<option value="Indian">Indian</option>
+</select><br>
+<label>Style:</label>
+<select id="styleFilter">
+<option value="All">All</option>
+<option value="Fine Dining">Fine Dining</option>
+<option value="Casual">Casual</option>
+<option value="Pizzeria">Pizzeria</option>
+<option value="Street Food">Street Food</option>
+<option value="Cafe/Fusion">Cafe/Fusion</option>
+</select>
+</div>
+
+<div id="sidebarToggle" onclick="sidebar.toggle()">🍴 Restaurants</div>
+
+<div id="sidebar" class="leaflet-sidebar collapsed">
+<div class="leaflet-sidebar-tabs">
+<ul>
+<li><a href="#home" title="Restaurants">🍴 Restaurants</a></li>
+</ul>
+</div>
+<div class="leaflet-sidebar-content">
+<div class="leaflet-sidebar-pane" id="home">
+<h1 class="leaflet-sidebar-header">Restaurants <span class="close" onclick="sidebar.close()">×</span></h1>
+<div id="restaurantList" style="max-height:80vh; overflow-y:auto;"></div>
+</div>
+</div>
+</div>
+
+<div id="legend"><strong>Legend</strong><br>Red = Italian, Blue = Indian<br>Circle=Fine Dining, Square=Casual, Triangle=Pizzeria, Star=Street Food/Cafe<br>Gradient = Rating light→dark</div>
+<div id="categories"><strong>Categories / Styles</strong><br>Circle: Fine Dining<br>Square: Casual<br>Triangle: Pizzeria<br>Star: Street Food/Cafe</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-sidebar-v2/js/leaflet-sidebar.min.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
+<script>
+// Initialize map
+const map = L.map('map').setView([-33.848,151.068],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+
+// Sidebar
+const sidebar = L.control.sidebar({ container: 'sidebar', position: 'left' }).addTo(map);
+
+// Make legend, categories, and filters draggable
+interact('#legend, #categories, .filter-container').draggable({listeners:{move:function(event){const target=event.target;const x=(parseFloat(target.getAttribute('data-x'))||0)+event.dx;const y=(parseFloat(target.getAttribute('data-y'))||0)+event.dy;target.style.transform=`translate(${x}px,${y}px)`;target.setAttribute('data-x',x);target.setAttribute('data-y',y);}}});
+
+// Function to create colored icons
+function createIcon(r){
+    let color = r.cuisine==="Italian" ? "ff0000":"0000ff";
+    const shade = Math.floor(255 - (r.rating/5)*150);
+    if(r.cuisine==="Italian"){color=`ff${shade.toString(16).padStart(2,'0')}00`;}
+    else{color=`${shade.toString(16).padStart(2,'0')}00ff`;}
+    let symbol="●";
+    switch(r.style){
+        case "Fine Dining": symbol="●"; break;
+        case "Casual": symbol="■"; break;
+        case "Pizzeria": symbol="▲"; break;
+        case "Street Food": case "Cafe/Fusion": symbol="★"; break;
+    }
+    return L.icon({iconUrl:`https://via.placeholder.com/30/${color}/ffffff?text=${encodeURIComponent(symbol)}`,iconSize:[30,30],iconAnchor:[15,30],popupAnchor:[0,-30]});
+}
+
+// Full 28 restaurants
+const restaurants=[
+{"name":"Ecco Ristorante","lat":-33.8547,"lon":151.1647,"cuisine":"Italian","style":"Fine Dining","rating":5,"image":"https://via.placeholder.com/150?text=Ecco","website":"https://www.ecco.com.au/"},
+{"name":"La Panchina","lat":-33.8858,"lon":151.2165,"cuisine":"Italian","style":"Pizzeria","rating":4,"image":"https://via.placeholder.com/150?text=La+Panchina","website":"https://www.opentable.com.au/r/la-panchina-surry-hills"},
+{"name":"Braci Osteria + Pizzeria","lat":-33.7985,"lon":151.1802,"cuisine":"Italian","style":"Pizzeria","rating":5,"image":"https://via.placeholder.com/150?text=Braci","website":"https://www.opentable.com.au/cuisine/best-pizzeria-restaurants-sydney-olympic-park"},
+{"name":"City Oltra","lat":-33.8825,"lon":151.2056,"cuisine":"Italian","style":"Casual","rating":4,"image":"https://via.placeholder.com/150?text=City+Oltra","website":"https://www.google.com/maps/place/City+Oltra"},
+{"name":"Divino Osteria","lat":-33.8700,"lon":151.2250,"cuisine":"Italian","style":"Fine Dining","rating":4.5,"image":"https://via.placeholder.com/150?text=Divino","website":"https://www.google.com/maps/place/Divino+Osteria"},
+{"name":"Fresh Cafe Neutral Bay","lat":-33.8390,"lon":151.2250,"cuisine":"Italian","style":"Casual","rating":4,"image":"https://via.placeholder.com/150?text=Fresh+Cafe","website":"https://www.google.com/maps/place/Fresh+Cafe+Neutral+Bay"},
+{"name":"Criniti’s","lat":-33.8100,"lon":151.0020,"cuisine":"Italian","style":"Pizzeria","rating":4.2,"image":"https://via.placeholder.com/150?text=Crinitis","website":"https://www.google.com/search?q=Criniti%E2%80%99s"},
+{"name":"Pikkio Pizzeria Trattoria","lat":-33.9350,"lon":151.0480,"cuisine":"Italian","style":"Pizzeria","rating":4.1,"image":"https://via.placeholder.com/150?text=Pikkio","website":"https://www.google.com/search?q=Pikkio+Pizzeria+Trattoria"},
+{"name":"La Bufala","lat":-33.9345,"lon":151.1810,"cuisine":"Italian","style":"Casual","rating":4,"image":"https://via.placeholder.com/150?text=La+Bufala","website":"https://www.google.com/search?q=La+Bufala"},
+{"name":"Andiamo Trattoria Rhodes","lat":-33.8165,"lon":151.0950,"cuisine":"Italian","style":"Fine Dining","rating":4.3,"image":"https://via.placeholder.com/150?text=Andiamo","website":"https://www.andiamotrattoria.com.au/feedback-rhodes/"},
+{"name":"Russo & Russo","lat":-33.8370,"lon":151.1040,"cuisine":"Italian","style":"Fine Dining","rating":4,"image":"https://via.placeholder.com/150?text=Russo","website":"https://www.russoandrusso.net.au/"},
+{"name":"Piccolo Roma (Olympic Park)","lat":-33.8468,"lon":151.0711,"cuisine":"Italian","style":"Pizzeria","rating":4.5,"image":"https://via.placeholder.com/150?text=Piccolo+Roma","website":"https://www.google.com/maps/place/Piccolo+Roma+Olympic+Park"},
+{"name":"Oliveto Ristorante & Bar","lat":-33.8560,"lon":151.2160,"cuisine":"Italian","style":"Fine Dining","rating":4.4,"image":"https://via.placeholder.com/150?text=Oliveto","website":"https://www.google.com/search?q=oliveto+ristorante+%26+bar"},
+{"name":"Pinky Ji","lat":-33.8700,"lon":151.2070,"cuisine":"Indian","style":"Casual","rating":4,"image":"https://via.placeholder.com/150?text=Pinky+Ji","website":"https://www.google.com/search?q=Pinky+Ji"},
+{"name":"Dosa Hut","lat":-33.8760,"lon":151.1000,"cuisine":"Indian","style":"Street Food","rating":4.5,"image":"https://via.placeholder.com/150?text=Dosa+Hut","website":"http://www.dosahut.com.au"},
+{"name":"Chatkazz","lat":-33.8740,"lon":151.0950,"cuisine":"Indian","style":"Street Food","rating":4.2,"image":"https://via.placeholder.com/150?text=Chatkazz","website":"https://www.google.com/search?q=Chatkazz"},
+{"name":"Don’t Tell Aunty","lat":-33.8800,"lon":151.2090,"cuisine":"Indian","style":"Fine Dining","rating":4,"image":"https://via.placeholder.com/150?text=Dont+Tell+Aunty","website":"https://www.google.com/search?q=Don’t+Tell+Aunty"},
+{"name":"Manjit’s Wharf","lat":-33.8690,"lon":151.2000,"cuisine":"Indian","style":"Fine Dining","rating":4.3,"image":"https://via.placeholder.com/150?text=Manjit","website":"https://www.google.com/search?q=Manjit%E2%80%99s+Wharf"},
+{"name":"The Spice Room","lat":-33.8610,"lon":151.2080,"cuisine":"Indian","style":"Fine Dining","rating":4.2,"image":"https://via.placeholder.com/150?text=Spice+Room","website":"https://www.google.com/search?q=The+Spice+Room"},
+{"name":"Delhi ’O’ Delhi","lat":-33.8970,"lon":151.1800,"cuisine":"Indian","style":"Fine Dining","rating":4.3,"image":"https://via.placeholder.com/150?text=Delhi+O+Delhi","website":"https://www.google.com/search?q=Delhi+’O’+Delhi"},
+{"name":"Urban Tadka","lat":-33.7090,"lon":151.2580,"cuisine":"Indian","style":"Fine Dining","rating":4.1,"image":"https://via.placeholder.com/150?text=Urban+Tadka","website":"https://www.google.com/search?q=Urban+Tadka"},
+{"name":"Faheem Fast Food","lat":-33.8960,"lon":151.1840,"cuisine":"Indian","style":"Street Food","rating":4,"image":"https://via.placeholder.com/150?text=Faheem","website":"https://www.google.com/search?q=Faheem+Fast+Food"},
+{"name":"Indian Home Diner","lat":-33.8890,"lon":151.2180,"cuisine":"Indian","style":"Street Food","rating":4,"image":"https://via.placeholder.com/150?text=Indian+Home","website":"https://www.google.com/search?q=Indian+Home+Diner"},
+{"name":"Spiced by Billus","lat":-33.8650,"lon":151.2010,"cuisine":"Indian","style":"Street Food","rating":4,"image":"https://via.placeholder.com/150?text=Spiced+Billus","website":"https://www.google.com/search?q=Spiced+by+Billus"},
+{"name":"Abhis Indian Restaurant","lat":-33.8520,"lon":151.0720,"cuisine":"Indian","style":"Fine Dining","rating":4.2,"image":"https://via.placeholder.com/150?text=Abhis","website":"http://www.abhisindian.com.au"},
+{"name":"Maharajas Indian Cuisine Homebush","lat":-33.8570,"lon":151.0520,"cuisine":"Indian","style":"Fine Dining","rating":4.1,"image":"https://via.placeholder.com/150?text=Maharajas","website":"https://maharajasindiancuisinehomebush.com.au/"},
+{"name":"New Shakthi Takeaway & Restaurant","lat":-33.8677,"lon":151.0838,"cuisine":"Indian","style":"Casual","rating":4,"image":"https://via.placeholder.com/150?text=New+Shakthi","website":"https://www.google.com/maps/place/New+Shakthi+Takeaway+and+Restaurant"},
+{"name":"Urbano Organic Coffee","lat":-33.8675,"lon":151.0850,"cuisine":"Indian","style":"Cafe/Fusion","rating":4,"image":"https://via.placeholder.com/150?text=Urbano+Coffee","website":"https://www.facebook.com/urbanoOrganicCoffee"}
+];
+
+// Add markers
+let markers = [];
+restaurants.forEach(r=>{
+    const marker = L.marker([r.lat,r.lon],{icon:createIcon(r)}).addTo(map);
+    marker.bindPopup(`<strong>${r.name}</strong><br>Cuisine: ${r.cuisine}<br>Style: ${r.style}<br>Rating: ${r.rating}<br><a href="${r.website}" target="_blank">Website</a><br><img src="${r.image}" width="150">`);
+    marker.restaurant = r;
+    markers.push(marker);
+});
+
+// Populate sidebar list
+const restaurantList = $('#restaurantList');
+restaurants.forEach(r=>{
+    restaurantList.append(`<div class="restaurant-list-item"><a href="#" onclick="map.setView([${r.lat},${r.lon}],16); sidebar.close();">${r.name} (${r.cuisine})</a></div>`);
+});
+
+// Heatmap by rating
+const heatData = restaurants.map(r=>[r.lat,r.lon,r.rating]);
+L.heatLayer(heatData,{radius:25,blur:15,maxZoom:17}).addTo(map);
+
+// Filters
+$('#cuisineFilter,#styleFilter').on('change',function(){
+  const cuisine=$('#cuisineFilter').val();
+  const style=$('#styleFilter').val();
+  markers.forEach(m=>{
+    const cMatch = (cuisine==="All" || m.restaurant.cuisine===cuisine);
+    const sMatch = (style==="All" || m.restaurant.style===style);
+    if(cMatch && sMatch) map.addLayer(m); else map.removeLayer(m);
+  });
+});
+map.whenReady(()=>map.invalidateSize());
+</script>
+</body>
+</html>
